@@ -1,0 +1,549 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Smart Irrigation Dashboard</title>
+
+<style>
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 18px;
+  font-family: Arial, sans-serif;
+  background: linear-gradient(135deg, #eaf6ef 0%, #edf5fb 55%, #f6f8ef 100%);
+  color: #172033;
+}
+
+header {
+  padding: 24px;
+  background: linear-gradient(120deg, #124734, #187a60);
+  color: white;
+  border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(18, 71, 52, .16);
+}
+
+header h1 { margin-top: 0; }
+header p { color: #dcece5; }
+
+.setup, .card, .status-box, .chart {
+  background: rgba(255, 255, 255, .96);
+  border: 1px solid #d9e7df;
+  border-radius: 13px;
+  padding: 16px;
+  box-shadow: 0 4px 14px rgba(30, 70, 55, .05);
+}
+
+.setup { margin-top: 16px; }
+
+input {
+  display: block;
+  width: 100%;
+  padding: 11px;
+  margin: 7px 0 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+}
+
+button {
+  padding: 11px 16px;
+  background: #176b54;
+  color: white;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+#message {
+  margin-top: 12px;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+h2 { margin: 26px 0 14px; }
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 14px;
+}
+
+.card h3 {
+  margin: 0 0 14px;
+  color: #657287;
+  font-size: 14px;
+}
+
+.value {
+  font-size: 27px;
+  font-weight: bold;
+  overflow-wrap: anywhere;
+}
+
+.unit {
+  color: #657287;
+  font-size: 12px;
+  margin-top: 8px;
+}
+
+.badge {
+  display: inline-block;
+  margin-top: 10px;
+  padding: 6px 10px;
+  border-radius: 20px;
+  background: #edf1f5;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.good { background: #d9f5e5; color: #17643b; }
+.warn { background: #fff0ce; color: #835500; }
+.bad { background: #ffe2df; color: #9c2828; }
+
+.water-alert {
+  margin-top: 14px;
+  padding: 18px;
+  border-radius: 14px;
+  border: 2px solid #d6e2dc;
+  background: #f4f8f5;
+  transition: background .2s ease, border-color .2s ease;
+}
+.water-alert.safe { background: #dff7e8; border-color: #39a96b; color: #14532d; }
+.water-alert.unsafe { background: #ffe5e2; border-color: #df5147; color: #7f1d1d; }
+.water-alert.check { background: #fff3d7; border-color: #d6a23b; color: #704d08; }
+.water-alert h3 { margin: 0 0 8px; }
+.alert-message { font-size: 16px; font-weight: bold; line-height: 1.5; }
+.small-note { color: #657287; font-size: 12px; line-height: 1.5; margin-top: 8px; }
+.pump-alert { margin-top: 12px; padding: 12px; border-radius: 10px; background: #f2f6f8; font-weight: bold; }
+
+.status-box {
+  line-height: 1.9;
+  overflow-wrap: anywhere;
+}
+
+.charts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  gap: 14px;
+}
+
+.chart { min-width: 0; padding: 10px; }
+.chart h3 { font-size: 15px; margin: 5px 4px 12px; }
+
+iframe {
+  display: block;
+  width: 100%;
+  height: 260px;
+  border: 0;
+}
+
+footer {
+  margin-top: 22px;
+  color: #657287;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+@media (max-width: 480px) {
+  body { padding: 10px; }
+  header { padding: 17px; }
+}
+
+/* Glowing LED indicators for live dashboard status */
+@keyframes ledPulseGreen {
+  0%, 100% { box-shadow: 0 0 4px 2px rgba(34,197,94,.55), 0 0 12px 4px rgba(34,197,94,.30); }
+  50% { box-shadow: 0 0 8px 4px rgba(34,197,94,.95), 0 0 22px 8px rgba(34,197,94,.55); }
+}
+@keyframes ledPulseRed {
+  0%, 100% { box-shadow: 0 0 4px 2px rgba(239,68,68,.55), 0 0 12px 4px rgba(239,68,68,.28); opacity: 1; }
+  50% { box-shadow: 0 0 10px 5px rgba(239,68,68,1), 0 0 24px 9px rgba(239,68,68,.6); opacity: .55; }
+}
+@keyframes ledPulseAmber {
+  0%, 100% { box-shadow: 0 0 4px 2px rgba(245,158,11,.5), 0 0 12px 4px rgba(245,158,11,.25); }
+  50% { box-shadow: 0 0 8px 4px rgba(245,158,11,.95), 0 0 20px 7px rgba(245,158,11,.45); }
+}
+.water-alert, .pump-alert { position: relative; padding-left: 48px !important; }
+.water-alert::before, .pump-alert::before {
+  content: ""; position: absolute; left: 18px; top: 24px;
+  width: 14px; height: 14px; border-radius: 50%;
+  background: #9ca3af; border: 2px solid rgba(255,255,255,.9);
+}
+.water-alert.safe::before { background: #22c55e; animation: ledPulseGreen 1.5s infinite; }
+.water-alert.unsafe::before { background: #ef4444; animation: ledPulseRed .7s infinite; }
+.water-alert.check::before { background: #f59e0b; animation: ledPulseAmber 1.2s infinite; }
+.pump-alert.pump-on::before { background: #22c55e; animation: ledPulseGreen .9s infinite; }
+.pump-alert.pump-off::before { background: #ef4444; animation: ledPulseRed 1.2s infinite; }
+.pump-alert.pump-unknown::before { background: #f59e0b; animation: ledPulseAmber 1.2s infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .water-alert::before, .pump-alert::before { animation: none !important; }
+}
+
+</style>
+</head>
+
+<body>
+
+<header>
+  <h1>Smart Irrigation Dashboard</h1>
+  <p>Low-Power RISC-V Agricultural IoT Monitoring System</p>
+  <div id="connection">Not connected yet</div>
+</header>
+
+<div class="setup">
+  <h3>Connect ThingSpeak Channel</h3>
+
+  <label for="channelId">Channel ID</label>
+  <input id="channelId" placeholder="Enter your channel ID">
+
+  <label for="readKey">Read API Key</label>
+  <input id="readKey" type="password"
+         placeholder="Required for a private channel">
+
+  <button onclick="connectChannel()">Connect Channel</button>
+  <div id="message">Enter your channel details above.</div>
+</div>
+
+<h2>Latest Sensor Readings</h2>
+
+<div class="grid">
+
+  <div class="card">
+    <h3>Soil Moisture</h3>
+    <div class="value" id="soil">--</div>
+    <div class="unit">Raw sensor reading (ADC)</div>
+    <span id="soilBadge" class="badge">Waiting for data</span>
+  </div>
+
+  <div class="card">
+    <h3>Temperature</h3>
+    <div class="value" id="temperature">--</div>
+    <div class="unit">°C</div>
+  </div>
+
+  <div class="card">
+    <h3>Humidity</h3>
+    <div class="value" id="humidity">--</div>
+    <div class="unit">%</div>
+  </div>
+
+  <div class="card">
+    <h3>Water Quality Sensor (Raw ADC)</h3>
+    <div class="value" id="water">--</div>
+    <div class="unit">Raw ADC reading (not ppm)</div>
+    <span id="waterBadge" class="badge">Waiting for data</span>
+  </div>
+
+
+  <div class="card">
+    <h3>Pump Status</h3>
+    <div class="value" id="pump">--</div>
+    <div class="unit">Status reported by controller</div>
+    <span id="pumpBadge" class="badge">Waiting for data</span>
+  </div>
+
+
+
+</div>
+
+<div id="waterAlert" class="water-alert check" role="status" aria-live="polite">
+  <h3 id="waterAlertTitle">Water quality: Waiting for reading</h3>
+  <div id="waterAlertMessage" class="alert-message">Connect ThingSpeak to check the reported water sensor value.</div>
+  <div class="small-note">Prototype thresholds: unsafe above 2700; safe below 2500. Values between thresholds retain the previous classification. This is a threshold-based warning, not a chemical test or certification that water is safe.</div>
+</div>
+<div id="pumpAlert" class="pump-alert" role="status" aria-live="polite">Pump alert: Waiting for controller status.</div>
+
+<h2>System Status</h2>
+
+<div class="status-box">
+  <div><strong>Soil condition:</strong>
+    <span id="soilText">Waiting for readings.</span>
+  </div>
+
+  <div><strong>Water quality alert:</strong>
+    <span id="waterText">Waiting for readings.</span>
+  </div>
+  <div><strong>Irrigation recommendation:</strong>
+    <span id="irrigationText">Waiting for readings.</span>
+  </div>
+  <div><strong>Pump report:</strong>
+    <span id="pumpText">Waiting for readings.</span>
+  </div>
+
+  <div><strong>Last update:</strong>
+    <span id="lastUpdate">--</span>
+  </div>
+</div>
+
+<h2>Sensor History and Graphs</h2>
+<div class="charts" id="charts"></div>
+
+<footer>
+  Dashboard checks ThingSpeak every 2 seconds; displayed readings change when new data has been uploaded by the ESP32.
+  ThingSpeak's write interval and your receiver's upload schedule control how quickly new readings become available.
+  Pump status is reported by the controller and does not confirm physical water flow. Water classification uses your prototype thresholds and does not identify specific industrial pollutants.
+</footer>
+
+<script>
+let channel = "";
+let apiKey = "";
+let refreshTimer = null;
+let chartRefreshTimer = null;
+
+// Assumed ThingSpeak field mapping. This version uses Field 5 for pump status.
+// If your receiver still writes pump status to Field 6, change PUMP_FIELD to 6.
+const PUMP_FIELD = 5;
+const fields = [
+  [1, "Soil Moisture"],
+  [2, "Temperature"],
+  [3, "Humidity"],
+  [4, "Water Quality"],
+  [PUMP_FIELD, "Pump Status"]
+];
+
+// Soil moisture hysteresis thresholds from the prototype setup.
+const DRY_THRESHOLD = 3000;
+const WET_THRESHOLD = 2000;
+
+// User-specified TDS / water-sensor prototype thresholds.
+const TDS_UNSAFE_ABOVE = 2700;
+const TDS_SAFE_BELOW = 2500;
+let lastWaterState = "unknown";
+
+function display(id, value, suffix = "") {
+  const el = document.getElementById(id);
+
+  if (value === null || value === undefined || value === "") {
+    el.textContent = "--";
+  } else {
+    el.textContent = value + suffix;
+  }
+}
+
+function setBadge(id, text, style = "") {
+  const el = document.getElementById(id);
+  el.textContent = text;
+  el.className = "badge " + style;
+}
+
+function connectChannel() {
+  channel = document.getElementById("channelId").value.trim();
+  apiKey = document.getElementById("readKey").value.trim();
+
+  if (!/^\d+$/.test(channel)) {
+    document.getElementById("message").textContent =
+      "Please enter a valid numeric Channel ID.";
+    return;
+  }
+
+  if (refreshTimer) clearInterval(refreshTimer);
+  if (chartRefreshTimer) clearInterval(chartRefreshTimer);
+
+  createCharts();
+  loadLatestData();
+
+  // Poll quickly for responsiveness. New values appear only after ThingSpeak receives a new ESP32 upload.
+  refreshTimer = setInterval(loadLatestData, 2000);
+  // Refresh embedded history graphs less often to avoid repeatedly reloading many iframes.
+  chartRefreshTimer = setInterval(createCharts, 60000);
+}
+
+async function loadLatestData() {
+  try {
+    let url =
+      "https://api.thingspeak.com/channels/" +
+      encodeURIComponent(channel) +
+      "/feeds/last.json";
+
+    url += "?t=" + Date.now();
+    if (apiKey) {
+      url += "&api_key=" + encodeURIComponent(apiKey);
+    }
+
+    const response = await fetch(url, { cache: "no-store" });
+
+    if (!response.ok) {
+      throw new Error("Unable to read channel. Check your channel ID and key.");
+    }
+
+    const data = await response.json();
+
+    if (!data.created_at) {
+      throw new Error("No readings found. Send data to this channel first.");
+    }
+
+    display("soil", data.field1);
+    display("temperature", data.field2);
+    display("humidity", data.field3);
+    display("water", data.field4);
+
+    updateSoil(data.field1);
+    updateWater(data.field4);
+    updatePump(data["field" + PUMP_FIELD]);
+
+    document.getElementById("lastUpdate").textContent =
+      new Date(data.created_at).toLocaleString();
+
+    document.getElementById("connection").textContent =
+      "Connected to ThingSpeak";
+
+    document.getElementById("message").textContent =
+      "Latest readings loaded successfully.";
+  } catch (error) {
+    document.getElementById("connection").textContent =
+      "Connection or data error";
+
+    document.getElementById("message").textContent = error.message;
+  }
+}
+
+function updateSoil(rawValue) {
+  if (rawValue === null || rawValue === undefined || rawValue === "") {
+    setBadge("soilBadge", "No soil data");
+    document.getElementById("soilText").textContent =
+      "The soil sensor reading is missing.";
+    return;
+  }
+
+  const soil = Number(rawValue);
+
+  if (!Number.isFinite(soil)) {
+    setBadge("soilBadge", "Invalid reading");
+    document.getElementById("soilText").textContent =
+      "The soil reading is not numeric.";
+  } else if (soil >= DRY_THRESHOLD) {
+    setBadge("soilBadge", "DRY", "warn");
+    document.getElementById("soilText").textContent =
+      "Raw reading is above " + DRY_THRESHOLD + " (classified as dry).";
+  } else if (soil <= WET_THRESHOLD) {
+    setBadge("soilBadge", "WET", "good");
+    document.getElementById("soilText").textContent =
+      "Raw reading is below " + WET_THRESHOLD + " (classified as wet).";
+  } else {
+    setBadge("soilBadge", "INTERMEDIATE");
+    document.getElementById("soilText").textContent =
+      "Reading is between " + WET_THRESHOLD + " and " +
+      DRY_THRESHOLD + ".";
+  }
+}
+
+
+function updateWater(rawValue) {
+  const alertBox = document.getElementById("waterAlert");
+  const title = document.getElementById("waterAlertTitle");
+  const message = document.getElementById("waterAlertMessage");
+  const waterText = document.getElementById("waterText");
+  const irrigationText = document.getElementById("irrigationText");
+
+  if (rawValue === null || rawValue === undefined || rawValue === "" || !Number.isFinite(Number(rawValue))) {
+    lastWaterState = "unknown";
+    alertBox.className = "water-alert check";
+    title.textContent = "Water quality: No valid reading";
+    message.textContent = "Check the TDS/water sensor and ThingSpeak Field 4.";
+    setBadge("waterBadge", "No valid reading", "warn");
+    waterText.textContent = "No valid water sensor reading.";
+    irrigationText.textContent = "Check the water source before irrigation.";
+    return;
+  }
+
+  const reading = Number(rawValue);
+  if (reading > TDS_UNSAFE_ABOVE) {
+    lastWaterState = "unsafe";
+  } else if (reading < TDS_SAFE_BELOW) {
+    lastWaterState = "safe";
+  } else if (lastWaterState === "unknown") {
+    // In the hysteresis band on first load, avoid guessing safe/unsafe.
+    alertBox.className = "water-alert check";
+    title.textContent = "Water quality: CHECK REQUIRED";
+    message.textContent = "Reading is in the 2500–2700 transition band. Verify the water before irrigation.";
+    setBadge("waterBadge", "Check water", "warn");
+    waterText.textContent = "Reading is in the transition band; classification is not yet established.";
+    irrigationText.textContent = "Do not treat this reading alone as proof of safe water.";
+    return;
+  }
+
+  if (lastWaterState === "unsafe") {
+    alertBox.className = "water-alert unsafe";
+    title.textContent = "UNSAFE WATER — IRRIGATION WARNING";
+    message.textContent = "Water sensor reading is above the unsafe threshold. Stop/avoid irrigation and inspect the water source.";
+    setBadge("waterBadge", "UNSAFE WATER", "bad");
+    waterText.textContent = "Potential water-quality anomaly detected (prototype threshold exceeded).";
+    irrigationText.textContent = "Avoid irrigation until the water is checked.";
+  } else {
+    alertBox.className = "water-alert safe";
+    title.textContent = "WATER READING WITHIN SET SAFE THRESHOLD";
+    message.textContent = "Reading is below the configured safe threshold. Continue monitoring; this does not prove the water is free of pollutants.";
+    setBadge("waterBadge", "Below threshold", "good");
+    waterText.textContent = "Reading is below the configured threshold.";
+    irrigationText.textContent = "Use only if other required water-quality checks are also satisfied.";
+  }
+}
+
+function updatePump(value) {
+  const status = String(value ?? "").trim().toUpperCase();
+
+  if (["1", "ON", "TRUE"].includes(status)) {
+    display("pump", "ON");
+    setBadge("pumpBadge", "Reported ON", "good");
+    document.getElementById("pumpText").textContent =
+      "The controller reports that the pump command is ON.";
+    document.getElementById("pumpAlert").className = "pump-alert pump-on";
+    document.getElementById("pumpAlert").textContent =
+      "PUMP STATUS: ON — controller reports the pump command is active.";
+  } else if (["0", "OFF", "FALSE"].includes(status)) {
+    display("pump", "OFF");
+    setBadge("pumpBadge", "Reported OFF", "bad");
+    document.getElementById("pumpText").textContent =
+      "The controller reports that the pump command is OFF.";
+    document.getElementById("pumpAlert").className = "pump-alert pump-off";
+    document.getElementById("pumpAlert").textContent =
+      "PUMP STATUS: OFF — controller reports the pump command is inactive.";
+  } else {
+    display("pump", value);
+    setBadge("pumpBadge", "Unknown status");
+    document.getElementById("pumpText").textContent =
+      "Check the format sent to ThingSpeak Field " + PUMP_FIELD + ".";
+    document.getElementById("pumpAlert").className = "pump-alert pump-unknown";
+    document.getElementById("pumpAlert").textContent =
+      "PUMP STATUS: UNKNOWN — check the receiver's ThingSpeak field mapping.";
+  }
+}
+
+function createCharts() {
+  const holder = document.getElementById("charts");
+  holder.innerHTML = "";
+
+  fields.forEach(([field, title]) => {
+    const card = document.createElement("div");
+    card.className = "chart";
+
+    const heading = document.createElement("h3");
+    heading.textContent = title + " History";
+
+    const frame = document.createElement("iframe");
+    frame.title = title + " graph";
+    frame.loading = "lazy";
+
+    let url =
+      "https://thingspeak.com/channels/" +
+      encodeURIComponent(channel) +
+      "/charts/" + field +
+      "?dynamic=true&results=60&type=line&width=auto";
+
+    if (apiKey) {
+      url += "&api_key=" + encodeURIComponent(apiKey);
+    }
+
+    frame.src = url;
+
+    card.appendChild(heading);
+    card.appendChild(frame);
+    holder.appendChild(card);
+  });
+}
+</script>
+
+</body>
+</html>
